@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using MarketDashboard.Infrastructure.Workers;
 
 using MarketDashboard.Core.Interfaces;
 using MarketDashboard.Infrastructure.DataSources;
@@ -35,6 +36,23 @@ public static class InfrastructureServiceExtensions
 
         // Register data source
         services.AddScoped<IMarketDataSource, AlphaVantageDataSource>();
+
+        // Identity configuration
+        services.AddIdentity<IdentityUser, IdentityRole>(options =>
+            {
+                options.Password.RequireDigit = true;
+                options.Password.RequireLowercase = true;
+                options.Password.RequireNonAlphanumeric = true;
+                options.Password.RequireUppercase = true;
+                options.Password.RequiredLength = 8;
+                options.SignIn.RequireConfirmedAccount = true;
+            })
+        .AddEntityFrameworkStores<AppDbContext>()
+        .AddSignInManager()
+        .AddDefaultTokenProviders();
+
+        // Background polling worker
+        services.AddHostedService<MarketDataPollingWorker>();
 
         return services;
     }
