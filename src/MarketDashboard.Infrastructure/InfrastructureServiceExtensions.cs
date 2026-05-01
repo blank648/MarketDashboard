@@ -38,15 +38,15 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IMarketDataSource, AlphaVantageDataSource>();
 
         // Identity configuration
-        services.AddIdentity<IdentityUser, IdentityRole>(options =>
+        services.AddIdentityCore<ApplicationUser>(options =>
             {
                 options.Password.RequireDigit = true;
-                options.Password.RequireLowercase = true;
-                options.Password.RequireNonAlphanumeric = true;
-                options.Password.RequireUppercase = true;
                 options.Password.RequiredLength = 8;
-                options.SignIn.RequireConfirmedAccount = true;
+                options.Password.RequireNonAlphanumeric = false;
+                options.Password.RequireUppercase = true;
+                options.SignIn.RequireConfirmedAccount = false;
             })
+        .AddRoles<IdentityRole>()
         .AddEntityFrameworkStores<AppDbContext>()
         .AddSignInManager()
         .AddDefaultTokenProviders();
