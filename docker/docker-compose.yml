@@ -1,0 +1,21 @@
+services:
+  postgres:
+    container_name: marketdashboard-postgres
+    image: postgres:16-alpine
+    ports:
+      - "5433:5432" # Changed from 5432:5432 due to host port collision
+    environment:
+      - POSTGRES_DB=marketdashboard
+      - POSTGRES_USER=marketdashboard
+      - POSTGRES_PASSWORD=marketdashboard
+    volumes:
+      - marketdashboard_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marketdashboard -d marketdashboard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  marketdashboard_postgres_data:

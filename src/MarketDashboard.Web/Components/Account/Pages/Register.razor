@@ -1,0 +1,122 @@
+@page "/Account/Register"
+@using System.ComponentModel.DataAnnotations
+@using MarketDashboard.Infrastructure.Data
+@using Microsoft.AspNetCore.Identity
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create account</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h1 class="h4 mb-3">Create account</h1>
+
+                @if (_errors.Count > 0)
+                {
+                    <div class="alert alert-danger" role="alert">
+                        <ul class="mb-0">
+                            @foreach (var error in _errors)
+                            {
+                                <li>@error</li>
+                            }
+                        </ul>
+                    </div>
+                }
+
+                <EditForm Model="Input" OnValidSubmit="HandleRegister" FormName="register" method="post">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger" role="alert" />
+
+                    <div class="mb-3">
+                        <label class="form-label" for="register-displayname">Display Name</label>
+                        <InputText id="register-displayname" @bind-Value="Input.DisplayName" class="form-control" placeholder="Your name" />
+                        <ValidationMessage For="() => Input.DisplayName" class="text-danger" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="register-email">Email</label>
+                        <InputText id="register-email" @bind-Value="Input.Email" class="form-control" autocomplete="username" placeholder="name@example.com" />
+                        <ValidationMessage For="() => Input.Email" class="text-danger" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="register-password">Password</label>
+                        <InputText id="register-password" type="password" @bind-Value="Input.Password" class="form-control" autocomplete="new-password" placeholder="password" />
+                        <ValidationMessage For="() => Input.Password" class="text-danger" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="register-confirm">Confirm password</label>
+                        <InputText id="register-confirm" type="password" @bind-Value="Input.ConfirmPassword" class="form-control" autocomplete="new-password" placeholder="confirm password" />
+                        <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">Create account</button>
+                </EditForm>
+
+                <div class="mt-3 text-center">
+                    <a href="/Account/Login">Already have an account?</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly List<string> _errors = new();
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    private async Task HandleRegister()
+    {
+        _errors.Clear();
+
+        var user = new ApplicationUser 
+        { 
+            UserName = Input.Email, 
+            Email = Input.Email,
+            DisplayName = Input.DisplayName 
+        };
+
+        var result = await UserManager.CreateAsync(user, Input.Password);
+
+        if (result.Succeeded)
+        {
+            await SignInManager.SignInAsync(user, isPersistent: false);
+            NavigationManager.NavigateTo("/");
+            return;
+        }
+
+        foreach (var error in result.Errors)
+        {
+            _errors.Add(error.Description);
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [Display(Name = "Display Name")]
+        public string DisplayName { get; set; } = "";
+
+        [Required]
+        [EmailAddress]
+        [Display(Name = "Email")]
+        public string Email { get; set; } = "";
+
+        [Required]
+        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [DataType(DataType.Password)]
+        [Display(Name = "Password")]
+        public string Password { get; set; } = "";
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirm password")]
+        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+        public string ConfirmPassword { get; set; } = "";
+    }
+}

@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+*.user
+.DS_Store
+appsettings.*.local.json
+appsettings.Production.json
+*.pfx
+*.p12
+.env
