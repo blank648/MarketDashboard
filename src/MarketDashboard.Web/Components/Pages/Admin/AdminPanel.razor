@@ -1,0 +1,12 @@
+@page "/admin"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+<PageTitle>Admin Panel</PageTitle>
+
+<h2>⚙️ Admin Panel</h2>
+<p class="text-muted">User and symbol management — implemented in Module 13.</p>
+<div class="alert alert-warning">
+    <strong>Admin only.</strong> This section requires the Admin role.
+</div>

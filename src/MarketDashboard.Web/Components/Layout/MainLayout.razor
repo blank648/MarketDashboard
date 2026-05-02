@@ -1,32 +1,45 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@rendermode InteractiveServer
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
-    <main>
-        <div class="top-row px-4">
-            <AuthorizeView>
-                <Authorized>
-                    <span class="me-3">Hello, @context.User.Identity?.Name!</span>
-                    <a href="/Account/Logout" class="btn btn-sm btn-outline-secondary">
-                        Log out
-                    </a>
-                </Authorized>
-                <NotAuthorized>
-                    <a href="/Account/Login" class="btn btn-sm btn-outline-primary">
-                        Log in
-                    </a>
-                    <a href="/Account/Register" class="btn btn-sm btn-primary ms-2">
-                        Register
-                    </a>
-                </NotAuthorized>
-            </AuthorizeView>
+<div class="app-layout">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-logo">📈</span>
+            <span class="sidebar-title">MarketDash</span>
         </div>
-        <article class="content px-4">
+        <NavMenu />
+    </aside>
+    <div class="main-content">
+        <header class="top-bar">
+            <div class="top-bar-left">
+                <span class="page-context">Financial Market Dashboard</span>
+            </div>
+            <div class="top-bar-right">
+                <AuthorizeView>
+                    <Authorized>
+                        <span class="user-email">@context.User.Identity?.Name</span>
+                        <form action="Account/Logout" method="post" class="d-inline">
+                            <AntiforgeryToken />
+                            <input type="hidden" name="ReturnUrl" value="/" />
+                            <button type="submit" class="btn btn-sm btn-outline-light ms-3">
+                                Log out
+                            </button>
+                        </form>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a href="Account/Login" class="btn btn-sm btn-outline-light">
+                            Log in
+                        </a>
+                        <a href="Account/Register"
+                           class="btn btn-sm btn-light ms-2">Register</a>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </header>
+        <main class="page-body">
             @Body
-        </article>
-    </main>
+        </main>
+    </div>
 </div>
 <div id="blazor-error-ui">
     An unhandled error has occurred.

@@ -1,0 +1,17 @@
+@page "/dashboard"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+<PageTitle>Dashboard</PageTitle>
+
+<h2>📊 Dashboard</h2>
+<p class="text-muted">
+    Real-time market prices will appear here.
+    <br/>
+    <small>Live updates via SignalR — implemented in Module 10.</small>
+</p>
+<div class="alert alert-info mt-3">
+    <strong>Status:</strong> MarketDataPollingWorker is active.
+    Prices are being collected in the background.
+</div>

@@ -1,7 +1,47 @@
-﻿@page "/"
+@page "/"
+@rendermode InteractiveServer
 
-<PageTitle>Home</PageTitle>
+<PageTitle>MarketDash — Financial Dashboard</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="home-hero">
+    <h1>MarketDash</h1>
+    <p class="lead">Real-time financial market data, powered by Alpha Vantage.</p>
+    <AuthorizeView>
+        <Authorized>
+            <a href="dashboard" class="btn btn-primary btn-lg">
+                Open Dashboard
+            </a>
+        </Authorized>
+        <NotAuthorized>
+            <a href="Account/Register" class="btn btn-primary btn-lg me-3">
+                Get Started
+            </a>
+            <a href="Account/Login" class="btn btn-outline-secondary btn-lg">
+                Log In
+            </a>
+        </NotAuthorized>
+    </AuthorizeView>
+</div>
 
-Welcome to your new app.
+<div class="features-grid mt-5">
+    <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h5>Real-Time Prices</h5>
+        <p>Live price updates via SignalR WebSocket connection.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">⭐</div>
+        <h5>Watchlist</h5>
+        <p>Track your favorite symbols in one place.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">🔔</div>
+        <h5>Price Alerts</h5>
+        <p>Get notified when a symbol crosses your threshold.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">📉</div>
+        <h5>Historical Data</h5>
+        <p>View OHLCV candlestick data for any tracked symbol.</p>
+    </div>
+</div>
