@@ -4,6 +4,8 @@ using MarketDashboard.Web.Components;
 using MarketDashboard.Web.Auth;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
+using MarketDashboard.Infrastructure.Workers;
+using MarketDashboard.Web.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,6 +35,11 @@ builder.Services.AddScoped<AuthenticationStateProvider,
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddSignalR();
+
+builder.Services.AddSingleton<IPriceUpdateBroadcaster,
+    SignalRPriceUpdateBroadcaster>();
+
 builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
@@ -53,6 +60,8 @@ app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+app.MapHub<MarketHub>("/hubs/market");
 
 // Identity Razor Pages endpoints (for Login/Register/Logout)
 app.MapAdditionalIdentityEndpoints();

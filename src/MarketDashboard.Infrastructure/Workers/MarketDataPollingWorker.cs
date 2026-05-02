@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using MarketDashboard.Core.DTOs;
 using MarketDashboard.Core.Entities;
 using MarketDashboard.Core.Interfaces;
 using MarketDashboard.Infrastructure.Data;
@@ -17,7 +18,8 @@ namespace MarketDashboard.Infrastructure.Workers;
 public class MarketDataPollingWorker(
     IServiceScopeFactory scopeFactory,
     IOptions<AlphaVantageOptions> options,
-    ILogger<MarketDataPollingWorker> logger) : BackgroundService
+    ILogger<MarketDataPollingWorker> logger,
+    IPriceUpdateBroadcaster broadcaster) : BackgroundService
 {
     private readonly TimeSpan _pollingInterval = options.Value.PollingInterval;
     private readonly string[] _fallbackSymbols = ["AAPL", "IBM"];
@@ -73,6 +75,8 @@ public class MarketDataPollingWorker(
 
         logger.LogInformation("Polling {Count} symbols", symbols.Count);
 
+        var priceUpdates = new List<PriceUpdateDto>();
+
         foreach (var symbol in symbols)
         {
             var dto = await dataSource.GetLatestPriceAsync(symbol, ct);
@@ -81,6 +85,8 @@ public class MarketDataPollingWorker(
                 logger.LogWarning("No data returned for {Symbol}", symbol);
                 continue;
             }
+
+            priceUpdates.Add(dto);
 
             var symbolId = await GetOrCreateSymbolIdAsync(db, dto.Symbol, ct);
 
@@ -101,6 +107,27 @@ public class MarketDataPollingWorker(
 
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Polling cycle complete. Saved prices for {Count} symbols", symbols.Count);
+
+        foreach (var update in priceUpdates)
+        {
+            try
+            {
+                await broadcaster.BroadcastPriceUpdateAsync(
+                    update.Symbol,
+                    update.Symbol, // Using ticker as placeholder for company name
+                    update.Price,
+                    null,          // previousPrice: null for now
+                    update.Volume,
+                    update.RecordedAt.Kind == DateTimeKind.Utc
+                        ? update.RecordedAt
+                        : update.RecordedAt.ToUniversalTime(),
+                    ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to broadcast price for {Symbol}: {Message}", update.Symbol, ex.Message);
+            }
+        }
     }
 
     private async Task<int> GetOrCreateSymbolIdAsync(
