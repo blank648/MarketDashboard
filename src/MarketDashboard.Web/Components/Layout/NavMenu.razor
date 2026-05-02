@@ -1,23 +1,29 @@
-@inject NavigationManager Nav
+@rendermode InteractiveServer
 
 <nav class="nav-menu">
-    <NavLink class="nav-item" href="" Match="NavLinkMatch.All">
-        <span class="nav-icon">🏠</span> Home
+    <NavLink class="nav-item" href="/" Match="NavLinkMatch.All">
+        <span class="nav-icon">⌂</span>
+        <span>Home</span>
     </NavLink>
 
     <AuthorizeView>
         <Authorized>
-            <NavLink class="nav-item" href="dashboard" Match="NavLinkMatch.Prefix">
-                <span class="nav-icon">📊</span> Dashboard
+            <div class="nav-section-label">Markets</div>
+            <NavLink class="nav-item" href="/dashboard" Match="NavLinkMatch.Prefix">
+                <span class="nav-icon">◈</span>
+                <span>Dashboard</span>
             </NavLink>
-            <NavLink class="nav-item" href="watchlist" Match="NavLinkMatch.Prefix">
-                <span class="nav-icon">⭐</span> Watchlist
+            <NavLink class="nav-item" href="/watchlist" Match="NavLinkMatch.Prefix">
+                <span class="nav-icon">☆</span>
+                <span>Watchlist</span>
             </NavLink>
-            <NavLink class="nav-item" href="alerts" Match="NavLinkMatch.Prefix">
-                <span class="nav-icon">🔔</span> Alerts
+            <NavLink class="nav-item" href="/alerts" Match="NavLinkMatch.Prefix">
+                <span class="nav-icon">◎</span>
+                <span>Alerts</span>
             </NavLink>
-            <NavLink class="nav-item" href="historical" Match="NavLinkMatch.Prefix">
-                <span class="nav-icon">📉</span> Historical
+            <NavLink class="nav-item" href="/historical" Match="NavLinkMatch.Prefix">
+                <span class="nav-icon">↗</span>
+                <span>Historical</span>
             </NavLink>
         </Authorized>
     </AuthorizeView>
@@ -25,9 +31,11 @@
     <AuthorizeView Roles="Admin">
         <Authorized>
             <hr class="nav-divider" />
-            <NavLink class="nav-item nav-item-admin" href="admin"
+            <div class="nav-section-label">System</div>
+            <NavLink class="nav-item nav-item-admin" href="/admin"
                      Match="NavLinkMatch.Prefix">
-                <span class="nav-icon">⚙️</span> Admin
+                <span class="nav-icon">⚙</span>
+                <span>Admin</span>
             </NavLink>
         </Authorized>
     </AuthorizeView>

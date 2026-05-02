@@ -1,46 +1,54 @@
 @page "/"
-
+@rendermode InteractiveServer
 <PageTitle>MarketDash — Financial Dashboard</PageTitle>
 
 <div class="home-hero">
-    <h1>MarketDash</h1>
-    <p class="lead">Real-time financial market data, powered by Alpha Vantage.</p>
-    <AuthorizeView>
-        <Authorized>
-            <a href="dashboard" class="btn btn-primary btn-lg">
-                Open Dashboard
-            </a>
-        </Authorized>
-        <NotAuthorized>
-            <a href="Account/Register" class="btn btn-primary btn-lg me-3">
-                Get Started
-            </a>
-            <a href="Account/Login" class="btn btn-outline-secondary btn-lg">
-                Log In
-            </a>
-        </NotAuthorized>
-    </AuthorizeView>
+    <h1>Market<span>Dash</span></h1>
+    <p class="lead">
+        Real-time financial market data and portfolio tracking,
+        powered by Alpha Vantage API.
+    </p>
+    <div class="home-actions">
+        <AuthorizeView>
+            <Authorized>
+                <a href="/dashboard" class="btn btn-primary btn-lg">
+                    Open Dashboard →
+                </a>
+                <a href="/watchlist" class="btn btn-secondary btn-lg">
+                    My Watchlist
+                </a>
+            </Authorized>
+            <NotAuthorized>
+                <a href="/Account/Register" class="btn btn-primary btn-lg">
+                    Get Started →
+                </a>
+                <a href="/Account/Login" class="btn btn-secondary btn-lg">
+                    Sign In
+                </a>
+            </NotAuthorized>
+        </AuthorizeView>
+    </div>
 </div>
 
-<div class="features-grid mt-5">
+<div class="features-grid">
     <div class="feature-card">
-        <div class="feature-icon">📊</div>
+        <div class="feature-card-icon">◈</div>
         <h5>Real-Time Prices</h5>
-        <p>Live price updates via SignalR WebSocket connection.</p>
+        <p>Live price updates via SignalR WebSocket — zero page refresh.</p>
     </div>
     <div class="feature-card">
-        <div class="feature-icon">⭐</div>
+        <div class="feature-card-icon">☆</div>
         <h5>Watchlist</h5>
-        <p>Track your favorite symbols in one place.</p>
+        <p>Track your favorite symbols with instant add/remove.</p>
     </div>
     <div class="feature-card">
-        <div class="feature-icon">🔔</div>
+        <div class="feature-card-icon">◎</div>
         <h5>Price Alerts</h5>
-        <p>Get notified when a symbol crosses your threshold.</p>
+        <p>Get notified when any symbol crosses your threshold.</p>
     </div>
     <div class="feature-card">
-        <div class="feature-icon">📉</div>
+        <div class="feature-card-icon">↗</div>
         <h5>Historical Data</h5>
-        <p>View OHLCV candlestick data for any tracked symbol.</p>
+        <p>OHLCV candlestick charts for any tracked symbol.</p>
     </div>
 </div>
