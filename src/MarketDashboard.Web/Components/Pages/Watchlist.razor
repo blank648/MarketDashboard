@@ -1,9 +1,188 @@
 @page "/watchlist"
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using MarketDashboard.Core.Interfaces
+@using MarketDashboard.Core.Entities
+@using Microsoft.Extensions.Logging
 @attribute [Authorize]
 @rendermode InteractiveServer
 
-<PageTitle>Watchlist</PageTitle>
+@inject IWatchlistService WatchlistService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ILogger<Watchlist> Logger
 
-<h2>⭐ Watchlist</h2>
-<p class="text-muted">Your personal watchlist — implemented in Module 9.</p>
+<div class="page-header mb-4">
+    <h2>⭐ My Watchlist</h2>
+    <p class="text-muted">Track your favorite market symbols.</p>
+</div>
+
+<!-- Add symbol form -->
+<div class="card mb-4" style="max-width: 500px;">
+    <div class="card-body">
+        <h6 class="card-title">Add Symbol</h6>
+        <div class="input-group">
+            <input type="text"
+                   class="form-control text-uppercase"
+                   placeholder="e.g. AAPL, IBM"
+                   @bind="_newSymbol"
+                   @bind:event="oninput"
+                   @onkeydown="@(async (e) =>
+                       { if (e.Key == "Enter") await AddSymbolAsync(); })"
+                   maxlength="20"
+                   disabled="@_isAdding" />
+            <button class="btn btn-primary"
+                    @onclick="AddSymbolAsync"
+                    disabled="@(_isAdding || string.IsNullOrWhiteSpace(_newSymbol))">
+                @(_isAdding ? "Adding..." : "Add")
+            </button>
+        </div>
+        @if (_errorMessage != null)
+        {
+            <div class="alert alert-danger mt-2 mb-0 py-2">@_errorMessage</div>
+        }
+        @if (_successMessage != null)
+        {
+            <div class="alert alert-success mt-2 mb-0 py-2">@_successMessage</div>
+        }
+    </div>
+</div>
+
+<!-- Watchlist table -->
+@if (_isLoading)
+{
+    <div class="d-flex align-items-center gap-2 text-muted">
+        <div class="spinner-border spinner-border-sm"></div>
+        <span>Loading watchlist...</span>
+    </div>
+}
+else if (_items.Count == 0)
+{
+    <div class="empty-state">
+        <div class="empty-state-icon">⭐</div>
+        <h5>Your watchlist is empty</h5>
+        <p>Add a stock symbol above to start tracking.</p>
+        <p class="text-muted small">
+            Tip: With the demo API key, only AAPL and IBM return live data.
+        </p>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Company</th>
+                        <th>Added</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in _items)
+                    {
+                        <tr>
+                            <td><strong class="text-primary">@item.Symbol</strong></td>
+                            <td class="text-muted">
+                                @(item.SymbolNavigation?.CompanyName ?? item.Symbol)
+                            </td>
+                            <td class="text-muted small">
+                                @item.AddedAt.ToString("MMM dd, yyyy")
+                            </td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-danger"
+                                        @onclick="() => RemoveSymbolAsync(item.Symbol)">
+                                    Remove
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<WatchlistItem> _items = [];
+    private string _newSymbol = string.Empty;
+    private string? _errorMessage;
+    private string? _successMessage;
+    private bool _isLoading = true;
+    private bool _isAdding = false;
+    private string _userId = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        _userId = authState.User.FindFirst(
+            System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+        await LoadWatchlistAsync();
+    }
+
+    private async Task LoadWatchlistAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var items = await WatchlistService.GetUserWatchlistAsync(
+                _userId, CancellationToken.None);
+            _items = items.ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load watchlist");
+            _errorMessage = "Failed to load watchlist.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task AddSymbolAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newSymbol)) return;
+        _isAdding = true;
+        _errorMessage = null;
+        _successMessage = null;
+        try
+        {
+            await WatchlistService.AddToWatchlistAsync(_userId, _newSymbol, CancellationToken.None);
+            _successMessage = $"{_newSymbol.Trim().ToUpperInvariant()} added to watchlist.";
+            _newSymbol = string.Empty;
+            await LoadWatchlistAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to add symbol");
+            _errorMessage = "Failed to add symbol. Please try again.";
+        }
+        finally
+        {
+            _isAdding = false;
+        }
+    }
+
+    private async Task RemoveSymbolAsync(string symbol)
+    {
+        try
+        {
+            await WatchlistService.RemoveFromWatchlistAsync(_userId, symbol, CancellationToken.None);
+            _items.RemoveAll(i => i.Symbol == symbol);
+            _successMessage = $"{symbol} removed from watchlist.";
+            _errorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to remove symbol");
+            _errorMessage = "Failed to remove symbol.";
+        }
+    }
+}
+      

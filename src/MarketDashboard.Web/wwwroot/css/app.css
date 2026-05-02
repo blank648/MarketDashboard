@@ -172,3 +172,18 @@ body {
     .sidebar-header { justify-content: center; padding: 1rem 0.5rem; }
     .page-body { padding: 1rem; }
 }
+
+/* ===== WATCHLIST & SHARED PAGE STYLES ===== */
+.page-header { border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem; }
+.page-header h2 { font-weight: 700; color: #1a1a2e; margin-bottom: 0.25rem; }
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #718096;
+}
+.empty-state-icon { font-size: 3rem; margin-bottom: 1rem; }
+.empty-state h5 { color: #2d3748; font-weight: 600; }
+
+.card { border: 1px solid #e2e8f0; border-radius: 10px; }
+.card-title { font-weight: 600; color: #2d3748; }

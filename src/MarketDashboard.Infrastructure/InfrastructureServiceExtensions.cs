@@ -7,6 +7,7 @@ using MarketDashboard.Infrastructure.Workers;
 
 using MarketDashboard.Core.Interfaces;
 using MarketDashboard.Infrastructure.DataSources;
+using MarketDashboard.Infrastructure.Services;
 using Microsoft.Extensions.Options;
 
 namespace MarketDashboard.Infrastructure;
@@ -53,6 +54,8 @@ public static class InfrastructureServiceExtensions
 
         // Background polling worker
         services.AddHostedService<MarketDataPollingWorker>();
+
+        services.AddScoped<IWatchlistService, WatchlistService>();
 
         return services;
     }
