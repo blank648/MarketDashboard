@@ -1,17 +1,16 @@
 @page "/Account/Logout"
 @using MarketDashboard.Infrastructure.Data
 @using Microsoft.AspNetCore.Identity
+@* No @rendermode directive — this runs as static SSR *@
 @inject SignInManager<ApplicationUser> SignInManager
 @inject NavigationManager NavigationManager
-
-<PageTitle>Log out</PageTitle>
-
-<p>Logging you out...</p>
+@inject ILogger<Logout> Logger
 
 @code {
     protected override async Task OnInitializedAsync()
     {
         await SignInManager.SignOutAsync();
+        Logger.LogInformation("User logged out.");
         NavigationManager.NavigateTo("/", forceLoad: true);
     }
 }
