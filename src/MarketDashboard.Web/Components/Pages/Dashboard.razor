@@ -1,16 +1,238 @@
 @page "/dashboard"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
+@rendermode InteractiveServer
+@implements IAsyncDisposable
 
-<PageTitle>Dashboard</PageTitle>
+@using Microsoft.AspNetCore.SignalR.Client
+@using MarketDashboard.Core.DTOs
+@using MarketDashboard.Core.Interfaces
+@using System.Security.Claims
 
-<h2>📊 Dashboard</h2>
-<p class="text-muted">
-    Real-time market prices will appear here.
-    <br/>
-    <small>Live updates via SignalR — implemented in Module 10.</small>
-</p>
-<div class="alert alert-info mt-3">
-    <strong>Status:</strong> MarketDataPollingWorker is active.
-    Prices are being collected in the background.
+@inject NavigationManager NavManager
+@inject IWatchlistService WatchlistService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ILogger<Dashboard> Logger
+
+<PageTitle>Dashboard — MarketDash</PageTitle>
+
+<!-- Header -->
+<div class="page-header">
+    <div style="display:flex;align-items:center;
+                justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div>
+            <h2>Dashboard</h2>
+            <p>Live market prices — updates every 60 seconds</p>
+        </div>
+        <div>
+            @if (_isConnected)
+            {
+                <span class="status-badge status-active">
+                    <span class="status-dot"></span>
+                    Live
+                </span>
+            }
+            else
+            {
+                <span class="status-badge"
+                      style="background:rgba(248,81,73,0.15);
+                             color:#f85149;">
+                    <span class="status-dot"
+                          style="background:#f85149;"></span>
+                    @_connectionStatus
+                </span>
+            }
+        </div>
+    </div>
 </div>
+
+<!-- Loading -->
+@if (_isLoading)
+{
+    <div class="loading-row">
+        <div class="spinner-sm"></div>
+        <span>Connecting to market feed...</span>
+    </div>
+}
+
+<!-- Content (shown after loading completes) -->
+@if (!_isLoading)
+{
+    @if (_prices.Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon">◈</div>
+            <h5>Waiting for market data</h5>
+            <p>The polling worker runs every 60 seconds.<br/>
+               Prices will appear automatically.</p>
+        </div>
+    }
+    else
+    {
+        <div class="price-grid">
+            @foreach (var kvp in _prices.OrderBy(p => p.Key))
+            {
+                var snap = kvp.Value;
+                var isUp = snap.ChangePercent >= 0;
+                var flashUp = _priceFlashUp.GetValueOrDefault(snap.Symbol);
+                var flashDown = _priceFlashDown.GetValueOrDefault(snap.Symbol);
+
+                <div class="price-card @(flashUp ? "flash-up" : "")
+                                       @(flashDown ? "flash-down" : "")">
+                    <div class="price-card-header">
+                        <span class="symbol-badge">@snap.Symbol</span>
+                        @if (_watchlistSymbols.Contains(snap.Symbol))
+                        {
+                            <span style="color:var(--accent-yellow);
+                                         font-size:14px;"
+                                  title="In your watchlist">☆</span>
+                        }
+                    </div>
+                    <div class="price-card-value
+                                @(isUp ? "price-up" : "price-down")">
+                        $@snap.CurrentPrice.ToString("N2")
+                    </div>
+                    @if (snap.ChangePercent.HasValue)
+                    {
+                        <div class="price-card-change
+                                    @(isUp ? "price-up" : "price-down")">
+                            @(isUp ? "▲" : "▼")
+                            @Math.Abs(snap.ChangePercent.Value).ToString("N2")%
+                        </div>
+                    }
+                    <div class="price-card-meta">
+                        Vol: @snap.Volume.ToString("N0")
+                    </div>
+                    <div class="price-card-meta">
+                        @snap.LastUpdated.ToLocalTime().ToString("HH:mm:ss")
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <div style="margin-top:24px;">
+        <p style="font-size:12px;color:var(--text-muted);">
+            Data: Alpha Vantage API (demo key — AAPL and IBM only).
+            Add symbols to your
+            <a href="/watchlist"
+               style="color:var(--accent-blue);">watchlist</a>
+            to track them here.
+        </p>
+    </div>
+}
+
+@code {
+    private HubConnection? _hubConnection;
+    private Dictionary<string, MarketSnapshotDto> _prices = new();
+    private HashSet<string> _watchlistSymbols = new();
+    private bool _isConnected;
+    private bool _isLoading = true;
+    private string _userId = string.Empty;
+    private string _connectionStatus = "Connecting...";
+    private Dictionary<string, bool> _priceFlashUp = new();
+    private Dictionary<string, bool> _priceFlashDown = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 1. Get current user ID
+        var authState = await AuthStateProvider
+            .GetAuthenticationStateAsync();
+        _userId = authState.User
+            .FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? string.Empty;
+
+        // 2. Load watchlist symbols to show ☆ on matching cards
+        try
+        {
+            var items = await WatchlistService
+                .GetUserWatchlistAsync(_userId, CancellationToken.None);
+            _watchlistSymbols = items.Select(i => i.Symbol).ToHashSet();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not load watchlist symbols");
+        }
+
+        // 3. Build HubConnection
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavManager.ToAbsoluteUri("/hubs/market"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        // 4. Register handler BEFORE StartAsync (mandatory ordering)
+        _hubConnection.On<MarketSnapshotDto>(
+            "ReceivePriceUpdate",
+            async snapshot =>
+            {
+                await InvokeAsync(() =>
+                {
+                    var symbol = snapshot.Symbol;
+                    bool isUp = !_prices.ContainsKey(symbol)
+                        || snapshot.CurrentPrice
+                           >= _prices[symbol].CurrentPrice;
+
+                    _prices[symbol] = snapshot;
+                    _priceFlashUp[symbol] = isUp;
+                    _priceFlashDown[symbol] = !isUp;
+                    StateHasChanged();
+
+                    // Clear flash after 800ms (fire-and-forget)
+                    _ = Task.Delay(800).ContinueWith(_ =>
+                        InvokeAsync(() =>
+                        {
+                            _priceFlashUp[symbol] = false;
+                            _priceFlashDown[symbol] = false;
+                            StateHasChanged();
+                        }));
+                });
+            });
+
+        // 5. Register reconnect event handlers
+        _hubConnection.Reconnecting += _ =>
+        {
+            _isConnected = false;
+            _connectionStatus = "Reconnecting...";
+            return InvokeAsync(StateHasChanged);
+        };
+
+        _hubConnection.Reconnected += _ =>
+        {
+            _isConnected = true;
+            _connectionStatus = "Live";
+            return InvokeAsync(StateHasChanged);
+        };
+
+        // 6. Start connection and join dashboard group
+        try
+        {
+            await _hubConnection.StartAsync();
+            await _hubConnection.SendAsync("JoinDashboard");
+            _isConnected = true;
+            _connectionStatus = "Live";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to connect to SignalR hub");
+            _connectionStatus = "Offline";
+        }
+
+        _isLoading = false;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+        {
+            try
+            {
+                await _hubConnection.SendAsync("LeaveDashboard");
+            }
+            catch
+            {
+                // Hub may already be disconnected — silently ignore
+            }
+            await _hubConnection.DisposeAsync();
+        }
+    }
+}

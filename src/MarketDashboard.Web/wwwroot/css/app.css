@@ -639,3 +639,69 @@ table.data-table tbody tr:hover td {
     .page-body { padding: 16px; }
     .features-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* ===== DASHBOARD — PRICE GRID ===== */
+.price-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.price-card {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: border-color 200ms ease, background-color 200ms ease;
+}
+
+.price-card:hover {
+    border-color: rgba(88,166,255,0.4);
+}
+
+.price-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.price-card-value {
+    font-family: var(--font-mono);
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+}
+
+.price-card-change {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.price-card-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+@keyframes flashUp {
+    0%   { background-color: rgba(63,185,80,0.25);
+           border-color: rgba(63,185,80,0.6); }
+    100% { background-color: var(--bg-secondary);
+           border-color: var(--border-color); }
+}
+
+@keyframes flashDown {
+    0%   { background-color: rgba(248,81,73,0.25);
+           border-color: rgba(248,81,73,0.6); }
+    100% { background-color: var(--bg-secondary);
+           border-color: var(--border-color); }
+}
+
+.flash-up   { animation: flashUp  0.8s ease-out forwards; }
+.flash-down { animation: flashDown 0.8s ease-out forwards; }
