@@ -267,6 +267,16 @@ html, body {
 .btn-sm { padding: 3px 10px; font-size: 12px; }
 .btn-lg { padding: 10px 24px; font-size: 15px; font-weight: 600; }
 
+.btn-danger {
+    background-color: rgba(248,81,73,0.15);
+    color: var(--accent-red);
+    border-color: rgba(248,81,73,0.3);
+}
+.btn-danger:hover {
+    background-color: rgba(248,81,73,0.25);
+    border-color: var(--accent-red);
+}
+
 .btn-danger-ghost {
     background: transparent;
     color: var(--text-muted);

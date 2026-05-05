@@ -1,8 +1,289 @@
 @page "/alerts"
-@using Microsoft.AspNetCore.Authorization
-@attribute [Authorize]
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
 
-<PageTitle>Price Alerts</PageTitle>
+@using MarketDashboard.Core.Interfaces
+@using MarketDashboard.Core.Entities
+@using MarketDashboard.Core.Enums
+@using System.Security.Claims
 
-<h2>🔔 Price Alerts</h2>
-<p class="text-muted">Configurable price alerts — implemented in Module 11.</p>
+@inject IPriceAlertService AlertService
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthStateProvider
+@inject Microsoft.Extensions.Logging.ILogger<Alerts> Logger
+
+<PageTitle>Alerts — MarketDash</PageTitle>
+
+<div class="page-header">
+    <h2>Price Alerts</h2>
+    <p>Get notified when a symbol crosses your target price</p>
+</div>
+
+<div class="card" style="margin-bottom:24px;">
+    <h5>New Alert</h5>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+        
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:12px;color:var(--text-muted);">
+                Symbol
+            </label>
+            <input @bind="_newSymbol"
+                   @bind:event="oninput"
+                   @bind:after="() => _newSymbol = _newSymbol.ToUpper()"
+                   placeholder="e.g. AAPL"
+                   maxlength="10"
+                   class="form-control"
+                   style="width:100px;" />
+        </div>
+        
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:12px;color:var(--text-muted);">
+                Target Price ($)
+            </label>
+            <input @bind="_newTargetPrice"
+                   type="number"
+                   step="0.01"
+                   min="0.01"
+                   placeholder="0.00"
+                   class="form-control"
+                   style="width:120px;" />
+        </div>
+        
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:12px;color:var(--text-muted);">
+                Direction
+            </label>
+            <select @bind="_newDirection" class="form-select"
+                    style="width:120px;">
+                <option value="@AlertDirection.Above">Above ▲</option>
+                <option value="@AlertDirection.Below">Below ▼</option>
+            </select>
+        </div>
+        
+        <button class="btn btn-primary"
+                @onclick="CreateAlertAsync"
+                disabled="@(_isCreating || string.IsNullOrWhiteSpace(_newSymbol)
+                             || _newTargetPrice <= 0)">
+            @if (_isCreating)
+            {
+                <span>Adding...</span>
+            }
+            else
+            {
+                <span>+ Add Alert</span>
+            }
+        </button>
+    </div>
+    
+    @if (!string.IsNullOrEmpty(_createError))
+    {
+        <p style="color:var(--accent-red);font-size:13px;margin-top:8px;">
+            @_createError
+        </p>
+    }
+    @if (!string.IsNullOrEmpty(_createSuccess))
+    {
+        <p style="color:var(--accent-green);font-size:13px;margin-top:8px;">
+            @_createSuccess
+        </p>
+    }
+</div>
+
+<div class="card" style="margin-bottom:24px;">
+    <h5>Active Alerts (@_alerts.Count())</h5>
+    
+    @if (_isLoading)
+    {
+        <div class="loading-row">
+            <div class="spinner-sm"></div>
+            <span>Loading alerts...</span>
+        </div>
+    }
+    else if (!_alerts.Any())
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon">◎</div>
+            <p>No active alerts. Create one above.</p>
+        </div>
+    }
+    else
+    {
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Direction</th>
+                    <th>Target Price</th>
+                    <th>Created</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var alert in _alerts)
+                {
+                    <tr>
+                        <td><span class="symbol-badge">@alert.Symbol</span></td>
+                        <td>
+                            @if (alert.Direction == AlertDirection.Above)
+                            {
+                                <span class="price-up">▲ Above</span>
+                            }
+                            else
+                            {
+                                <span class="price-down">▼ Below</span>
+                            }
+                        </td>
+                        <td style="font-family:var(--font-mono);">
+                            $@alert.ThresholdPrice.ToString("N2")
+                        </td>
+                        <td style="color:var(--text-muted);font-size:12px;">
+                            @alert.CreatedAt.ToLocalTime()
+                                   .ToString("dd MMM yyyy HH:mm")
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-danger"
+                                    @onclick="() => DeleteAlertAsync(alert.Id)"
+                                    title="Delete alert">
+                                ✕
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+<div class="card">
+    <h5>Trigger History (last 20)</h5>
+    
+    @if (!_history.Any())
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon">◎</div>
+            <p>No alerts have triggered yet.</p>
+        </div>
+    }
+    else
+    {
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Target</th>
+                    <th>Trigger Price</th>
+                    <th>Triggered At</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var h in _history)
+                {
+                    <tr>
+                        <td><span class="symbol-badge">@(h.Alert?.Symbol ?? "-")</span></td>
+                        <td style="font-family:var(--font-mono);">
+                            $@(h.Alert?.ThresholdPrice.ToString("N2") ?? "-")
+                        </td>
+                        <td style="font-family:var(--font-mono);">
+                            $@h.PriceAtTrigger.ToString("N2")
+                        </td>
+                        <td style="color:var(--text-muted);font-size:12px;">
+                            @h.TriggeredAt.ToLocalTime()
+                                         .ToString("dd MMM yyyy HH:mm:ss")
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private IEnumerable<PriceAlert> _alerts = [];
+    private IEnumerable<AlertHistory> _history = [];
+    private bool _isLoading = true;
+    private bool _isCreating;
+    private string _userId = string.Empty;
+    private string _newSymbol = string.Empty;
+    private decimal _newTargetPrice;
+    private AlertDirection _newDirection = AlertDirection.Above;
+    private string _createError = string.Empty;
+    private string _createSuccess = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider
+            .GetAuthenticationStateAsync();
+        _userId = authState.User
+            .FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? string.Empty;
+
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _alerts = await AlertService.GetUserAlertsAsync(
+                _userId, CancellationToken.None);
+            _history = await AlertService.GetUserAlertHistoryAsync(
+                _userId, 20, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load alerts");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CreateAlertAsync()
+    {
+        _createError = string.Empty;
+        _createSuccess = string.Empty;
+        _isCreating = true;
+
+        try
+        {
+            await AlertService.CreateAlertAsync(
+                _userId, _newSymbol, _newTargetPrice,
+                _newDirection, CancellationToken.None);
+
+            _createSuccess =
+                $"Alert set: {_newSymbol} {_newDirection} ${_newTargetPrice:N2}";
+            _newSymbol = string.Empty;
+            _newTargetPrice = 0;
+
+            await LoadDataAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _createError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to create alert");
+            _createError = "Failed to create alert. Please try again.";
+        }
+        finally
+        {
+            _isCreating = false;
+        }
+    }
+
+    private async Task DeleteAlertAsync(int alertId)
+    {
+        try
+        {
+            await AlertService.DeleteAlertAsync(
+                alertId, _userId, CancellationToken.None);
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete alert {AlertId}", alertId);
+        }
+    }
+}

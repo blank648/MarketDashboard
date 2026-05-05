@@ -106,6 +106,13 @@ public class MarketDataPollingWorker(
         }
 
         await db.SaveChangesAsync(ct);
+        
+        var alertService = scope.ServiceProvider.GetRequiredService<IPriceAlertService>();
+        foreach (var update in priceUpdates)
+        {
+            await alertService.CheckAndTriggerAlertsAsync(update.Symbol, update.Price, ct);
+        }
+
         logger.LogInformation("Polling cycle complete. Saved prices for {Count} symbols", symbols.Count);
 
         foreach (var update in priceUpdates)
@@ -152,4 +159,3 @@ public class MarketDataPollingWorker(
         return symbol.Id;
     }
 }
-

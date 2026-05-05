@@ -19,6 +19,10 @@ public static class InfrastructureServiceExtensions
         var connStr = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
 
+        services.AddDbContextFactory<AppDbContext>(options =>
+            options.UseNpgsql(connStr, npgsqlOptions =>
+                npgsqlOptions.UseTimestampTzDateTimeKind()));
+            
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connStr, npgsqlOptions =>
                 npgsqlOptions.UseTimestampTzDateTimeKind()));
@@ -56,6 +60,7 @@ public static class InfrastructureServiceExtensions
         services.AddHostedService<MarketDataPollingWorker>();
 
         services.AddScoped<IWatchlistService, WatchlistService>();
+        services.AddScoped<IPriceAlertService, PriceAlertService>();
 
         return services;
     }
