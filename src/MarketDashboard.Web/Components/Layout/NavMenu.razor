@@ -21,7 +21,7 @@
                 <span class="nav-icon">◎</span>
                 <span>Alerts</span>
             </NavLink>
-            <NavLink class="nav-item" href="/historical" Match="NavLinkMatch.Prefix">
+            <NavLink class="nav-item" href="/history" Match="NavLinkMatch.Prefix">
                 <span class="nav-icon">↗</span>
                 <span>Historical</span>
             </NavLink>
@@ -31,11 +31,14 @@
     <AuthorizeView Roles="Admin">
         <Authorized>
             <hr class="nav-divider" />
-            <div class="nav-section-label">System</div>
-            <NavLink class="nav-item nav-item-admin" href="/admin"
-                     Match="NavLinkMatch.Prefix">
+            <div class="nav-section-label">Admin</div>
+            <NavLink class="nav-item" href="admin/users">
                 <span class="nav-icon">⚙</span>
-                <span>Admin</span>
+                <span>Users</span>
+            </NavLink>
+            <NavLink class="nav-item" href="admin/symbols">
+                <span class="nav-icon">◈</span>
+                <span>Symbols</span>
             </NavLink>
         </Authorized>
     </AuthorizeView>

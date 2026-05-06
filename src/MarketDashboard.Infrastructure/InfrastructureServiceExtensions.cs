@@ -61,6 +61,8 @@ public static class InfrastructureServiceExtensions
 
         services.AddScoped<IWatchlistService, WatchlistService>();
         services.AddScoped<IPriceAlertService, PriceAlertService>();
+        services.AddScoped<IOhlcvService, OhlcvService>();
+        services.AddScoped<AdminService>();
 
         return services;
     }

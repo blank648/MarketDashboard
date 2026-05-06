@@ -1,0 +1,161 @@
+@page "/admin/users"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@using MarketDashboard.Infrastructure.Services
+@using MarketDashboard.Core.DTOs
+@inject AdminService AdminService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ILogger<UserManagement> Logger
+
+<PageTitle>User Management — MarketDash</PageTitle>
+
+<div class="page-header">
+    <h2>User Management</h2>
+    <p>Manage accounts and admin privileges</p>
+</div>
+
+@if (!string.IsNullOrEmpty(_message))
+{
+    <div class="alert @(_isError ? "alert-error" : "alert-success")">
+        @_message
+    </div>
+}
+
+<div class="card">
+    @if (_isLoading)
+    {
+        <div class="loading-row">
+            <div class="spinner-sm"></div>
+            <span>Loading users...</span>
+        </div>
+    }
+    else if (_users.Count == 0)
+    {
+        <div class="empty-state">
+            <p>No users found.</p>
+        </div>
+    }
+    else
+    {
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var user in _users)
+                {
+                    <tr>
+                        <td>@user.Email</td>
+                        <td style="color:var(--text-muted);">@user.UserName</td>
+                        <td>
+                            @if (user.IsAdmin)
+                            {
+                                <span class="badge badge-admin">Admin</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-user">User</span>
+                            }
+                        </td>
+                        <td style="display:flex;gap:8px;">
+                            <button class="btn btn-sm @(user.IsAdmin ? "btn-warning" : "btn-primary")"
+                                    @onclick="() => ToggleAdminAsync(user.Id)"
+                                    disabled="@(_processingId == user.Id)">
+                                @(user.IsAdmin ? "Revoke Admin" : "Grant Admin")
+                            </button>
+                            @if (user.Id != _currentUserId)
+                            {
+                                <button class="btn btn-sm btn-danger"
+                                        @onclick="() => DeleteUserAsync(user.Id)"
+                                        disabled="@(_processingId == user.Id)">
+                                    Delete
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<UserAdminDto> _users = [];
+    private string _currentUserId = string.Empty;
+    private string _message = string.Empty;
+    private bool _isError;
+    private bool _isLoading = true;
+    private string _processingId = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        _currentUserId = auth.User.FindFirst(
+            System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? string.Empty;
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await AdminService
+                .GetAllUsersAsync(CancellationToken.None);
+            _users = result.ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load users");
+            _message = "Failed to load users.";
+            _isError = true;
+        }
+        finally { _isLoading = false; }
+    }
+
+    private async Task ToggleAdminAsync(string userId)
+    {
+        _processingId = userId;
+        _message = string.Empty;
+        try
+        {
+            _message = await AdminService
+                .ToggleAdminRoleAsync(userId, CancellationToken.None);
+            _isError = false;
+            await LoadUsersAsync();
+        }
+        catch (Exception ex)
+        {
+            _message = ex.Message;
+            _isError = true;
+        }
+        finally { _processingId = string.Empty; }
+    }
+
+    private async Task DeleteUserAsync(string userId)
+    {
+        _processingId = userId;
+        _message = string.Empty;
+        try
+        {
+            await AdminService.DeleteUserAsync(
+                userId, _currentUserId, CancellationToken.None);
+            _message = "User deleted.";
+            _isError = false;
+            await LoadUsersAsync();
+        }
+        catch (Exception ex)
+        {
+            _message = ex.Message;
+            _isError = true;
+        }
+        finally { _processingId = string.Empty; }
+    }
+}

@@ -2,7 +2,7 @@
 
 > **Lucrare universitară** — Proiectarea Aplicațiilor Web  
 > **Student:** Adrian Diaconescu  
-> **Facultate:** Universitatea Tehnică — Inginerie Software  
+> **Facultate:** Universitatea din București - Facultatea de Matematică și Informatică 
 > **An universitar:** 2025–2026
 
 Aplicație web **Full-Stack** în C# pentru vizualizarea și monitorizarea datelor financiare în timp real, construită pe ASP.NET Core 8, Blazor Server și SignalR.
@@ -40,12 +40,12 @@ Proiectul demonstrează aplicarea practică a conceptelor:
 │     └── AlphaVantageClient                          │
 │     └── CppSharedDbDataSource (optional)            │
 │                                                     │
-│  MarketDataPollingWorker (IHostedService)            │
+│  MarketDataPollingWorker (IHostedService)           │
 │     ├── Polls data → writes to PostgreSQL           │
 │     ├── Evaluates price alerts                      │
 │     └── Pushes updates via SignalR                  │
 │                                                     │
-│  SignalR Hub (MarketHub)                             │
+│  SignalR Hub (MarketHub)                            │
 │     └── Real-time push to Blazor components         │
 │                                                     │
 │  Blazor Server UI                                   │

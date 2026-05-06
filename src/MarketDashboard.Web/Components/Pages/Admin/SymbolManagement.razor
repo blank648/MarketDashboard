@@ -1,0 +1,188 @@
+@page "/admin/symbols"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@using MarketDashboard.Infrastructure.Services
+@using MarketDashboard.Core.Entities
+@inject AdminService AdminService
+@inject ILogger<SymbolManagement> Logger
+
+<PageTitle>Symbol Management — MarketDash</PageTitle>
+
+<div class="page-header">
+    <h2>Symbol Management</h2>
+    <p>Add or deactivate tracked market symbols</p>
+</div>
+
+@if (!string.IsNullOrEmpty(_message))
+{
+    <div class="alert @(_isError ? "alert-error" : "alert-success")">
+        @_message
+    </div>
+}
+
+<div class="card" style="margin-bottom:24px;">
+    <h5>Add New Symbol</h5>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end; margin-top:16px;">
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:12px;color:var(--text-muted);">
+                Ticker
+            </label>
+            <input class="form-input"
+                   @bind="_newTicker"
+                   @bind:after="() => _newTicker = _newTicker.ToUpper()"
+                   placeholder="e.g. MSFT"
+                   style="width:120px;"
+                   maxlength="10" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:12px;color:var(--text-muted);">
+                Company Name
+            </label>
+            <input class="form-input"
+                   @bind="_newCompanyName"
+                   placeholder="e.g. Microsoft Corp"
+                   style="width:220px;"
+                   maxlength="100" />
+        </div>
+        <button class="btn btn-primary"
+                @onclick="AddSymbolAsync"
+                disabled="@(_isAdding || string.IsNullOrWhiteSpace(_newTicker))">
+            @(_isAdding ? "Adding..." : "+ Add Symbol")
+        </button>
+    </div>
+    @if (!string.IsNullOrEmpty(_addError))
+    {
+        <p style="color:var(--accent-red);font-size:13px;margin-top:8px;">
+            @_addError
+        </p>
+    }
+</div>
+
+<div class="card">
+    @if (_isLoading)
+    {
+        <div class="loading-row">
+            <div class="spinner-sm"></div>
+            <span>Loading symbols...</span>
+        </div>
+    }
+    else
+    {
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Ticker</th>
+                    <th>Company Name</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in _symbols)
+                {
+                    <tr>
+                        <td style="font-family:var(--font-mono); font-weight:600;">
+                            @s.Ticker
+                        </td>
+                        <td>@s.CompanyName</td>
+                        <td>
+                            @if (s.IsActive)
+                            {
+                                <span class="badge badge-active">
+                                    ● Active
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-inactive">
+                                    ○ Inactive
+                                </span>
+                            }
+                        </td>
+                        <td>
+                            <button class="btn btn-sm @(s.IsActive ? "btn-warning" : "btn-primary")"
+                                    @onclick="() => ToggleSymbolAsync(s.Id)"
+                                    disabled="@(_processingId == s.Id)">
+                                @(s.IsActive ? "Deactivate" : "Activate")
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<Symbol> _symbols = [];
+    private string _newTicker = string.Empty;
+    private string _newCompanyName = string.Empty;
+    private string _message = string.Empty;
+    private string _addError = string.Empty;
+    private bool _isError;
+    private bool _isLoading = true;
+    private bool _isAdding;
+    private int _processingId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSymbolsAsync();
+    }
+
+    private async Task LoadSymbolsAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await AdminService
+                .GetAllSymbolsAsync(CancellationToken.None);
+            _symbols = result.ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load symbols");
+        }
+        finally { _isLoading = false; }
+    }
+
+    private async Task AddSymbolAsync()
+    {
+        _addError = string.Empty;
+        _isAdding = true;
+        try
+        {
+            await AdminService.AddSymbolAsync(
+                _newTicker, _newCompanyName, CancellationToken.None);
+            _message = $"Symbol {_newTicker} added successfully.";
+            _isError = false;
+            _newTicker = string.Empty;
+            _newCompanyName = string.Empty;
+            await LoadSymbolsAsync();
+        }
+        catch (Exception ex)
+        {
+            _addError = ex.Message;
+        }
+        finally { _isAdding = false; }
+    }
+
+    private async Task ToggleSymbolAsync(int symbolId)
+    {
+        _processingId = symbolId;
+        try
+        {
+            var status = await AdminService
+                .ToggleSymbolActiveAsync(symbolId, CancellationToken.None);
+            _message = $"Symbol {status}.";
+            _isError = false;
+            await LoadSymbolsAsync();
+        }
+        catch (Exception ex)
+        {
+            _message = ex.Message;
+            _isError = true;
+        }
+        finally { _processingId = 0; }
+    }
+}

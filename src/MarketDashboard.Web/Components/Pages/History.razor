@@ -1,0 +1,315 @@
+@page "/history"
+@page "/historical"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+
+@using MarketDashboard.Core.Interfaces
+@using MarketDashboard.Core.Entities
+
+@inject IOhlcvService OhlcvService
+@inject IJSRuntime JS
+@inject ILogger<History> Logger
+
+<PageTitle>History — MarketDash</PageTitle>
+
+<!-- Page header -->
+<div class="page-header">
+    <h2>Price History</h2>
+    <p>Historical OHLCV data with candlestick visualization</p>
+</div>
+
+<!-- Controls card -->
+<div class="card" style="margin-bottom:24px;">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;">
+
+        <!-- Symbol selector -->
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:12px;color:var(--text-muted);">Symbol</label>
+            <select @bind="_selectedSymbol"
+                    @bind:after="OnSymbolChangedAsync"
+                    class="form-control"
+                    style="width:120px;">
+                @foreach (var s in _availableSymbols)
+                {
+                    <option value="@s">@s</option>
+                }
+            </select>
+        </div>
+
+        <!-- From date -->
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:12px;color:var(--text-muted);">From</label>
+            <input type="date"
+                   @bind="_fromDate"
+                   @bind:after="OnDateChangedAsync"
+                   class="form-control"
+                   style="width:145px;" />
+        </div>
+
+        <!-- To date -->
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:12px;color:var(--text-muted);">To</label>
+            <input type="date"
+                   @bind="_toDate"
+                   @bind:after="OnDateChangedAsync"
+                   class="form-control"
+                   style="width:145px;" />
+        </div>
+
+        <button class="btn btn-primary"
+                @onclick="RefreshAsync"
+                disabled="@_isSyncing">
+            @(_isSyncing ? "Syncing..." : "↻ Refresh")
+        </button>
+    </div>
+</div>
+
+<!-- Chart card -->
+<div class="card" style="margin-bottom:24px;">
+    @if (_isSyncing || _isLoading)
+    {
+        <div class="loading-row">
+            <div class="spinner-sm"></div>
+            <span>@(_isSyncing ? "Fetching from Alpha Vantage..." : "Loading chart...")</span>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(_syncError))
+    {
+        <p style="color:var(--accent-red);font-size:13px;">@_syncError</p>
+    }
+    <div style="position:relative;height:360px;">
+        <canvas id="ohlcvChart"></canvas>
+    </div>
+</div>
+
+<!-- Data table card -->
+<div class="card">
+    <h5>Data — @_selectedSymbol
+        <span style="font-weight:400;font-size:13px;color:var(--text-muted);">
+            (@_records.Count records)
+        </span>
+    </h5>
+
+    @if (_records.Count == 0 && !_isLoading && !_isSyncing)
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon">◈</div>
+            <p>No data for this range. Try clicking ↻ Refresh.</p>
+        </div>
+    }
+    else if (_records.Count > 0)
+    {
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Open</th>
+                    <th>High</th>
+                    <th>Low</th>
+                    <th>Close</th>
+                    <th>Volume</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in _records.OrderByDescending(x => x.PeriodStart))
+                {
+                    var isUp = r.Close >= r.Open;
+                    <tr>
+                        <td style="font-family:var(--font-mono);
+                                   font-size:13px;">
+                            @r.PeriodStart.ToString("dd MMM yyyy")
+                        </td>
+                        <td style="font-family:var(--font-mono);">
+                            $@r.Open.ToString("N2")
+                        </td>
+                        <td style="font-family:var(--font-mono);
+                                   color:var(--accent-green);">
+                            $@r.High.ToString("N2")
+                        </td>
+                        <td style="font-family:var(--font-mono);
+                                   color:var(--accent-red);">
+                            $@r.Low.ToString("N2")
+                        </td>
+                        <td style="font-family:var(--font-mono);"
+                            class="@(isUp ? "price-up" : "price-down")">
+                            $@r.Close.ToString("N2")
+                        </td>
+                        <td style="font-family:var(--font-mono);
+                                   color:var(--text-muted);">
+                            @r.Volume.ToString("N0")
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<OhlcvRecord> _records = [];
+    private List<string> _availableSymbols = [];
+    private string _selectedSymbol = "IBM";
+    private DateOnly _fromDate =
+        DateOnly.FromDateTime(DateTime.Today.AddDays(-30));
+    private DateOnly _toDate =
+        DateOnly.FromDateTime(DateTime.Today);
+    private bool _isLoading;
+    private bool _isSyncing;
+    private string _syncError = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var symbols = await OhlcvService
+                .GetAvailableSymbolsAsync(CancellationToken.None);
+            _availableSymbols = symbols.ToList();
+            if (_availableSymbols.Count > 0 &&
+                !_availableSymbols.Contains(_selectedSymbol))
+                _selectedSymbol = _availableSymbols[0];
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not load available symbols");
+            _availableSymbols = ["IBM", "AAPL"];
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await SyncAndLoadAsync();
+        }
+    }
+
+    private async Task OnSymbolChangedAsync()
+    {
+        await SyncAndLoadAsync();
+    }
+
+    private async Task OnDateChangedAsync()
+    {
+        await LoadChartAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        _isSyncing = true;
+        _syncError = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            // Force fresh sync by calling directly
+            await OhlcvService.SyncAsync(
+                _selectedSymbol, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Sync failed for {Symbol}", _selectedSymbol);
+            _syncError = $"Sync failed: {ex.Message}";
+        }
+        finally
+        {
+            _isSyncing = false;
+        }
+
+        await LoadChartAsync();
+    }
+
+    private async Task SyncAndLoadAsync()
+    {
+        _isSyncing = true;
+        _syncError = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            await OhlcvService.SyncAsync(
+                _selectedSymbol, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex,
+                "Sync failed for {Symbol} — loading cached data",
+                _selectedSymbol);
+            _syncError = "Could not fetch latest data. Showing cached.";
+        }
+        finally
+        {
+            _isSyncing = false;
+        }
+
+        await LoadChartAsync();
+    }
+
+    private async Task LoadChartAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var data = await OhlcvService.GetRecordsAsync(
+                _selectedSymbol, _fromDate, _toDate,
+                CancellationToken.None);
+            _records = data.ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load OHLCV records");
+            _records = [];
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+
+        StateHasChanged();
+        await RenderChartAsync();
+    }
+
+    private async Task RenderChartAsync()
+    {
+        if (_records.Count == 0) return;
+
+        var ordered = _records.OrderBy(r => r.PeriodStart).ToList();
+        var labels  = ordered.Select(r =>
+            r.PeriodStart.ToString("dd MMM")).ToArray();
+        var ohlc = ordered.Select(r => new
+        {
+            label  = r.PeriodStart.ToString("dd MMM"),
+            open   = (double)r.Open,
+            high   = (double)r.High,
+            low    = (double)r.Low,
+            close  = (double)r.Close
+        }).ToArray();
+        var volumes = ordered.Select(r => (long)r.Volume).ToArray();
+
+        try
+        {
+            await JS.InvokeVoidAsync(
+                "chartInterop.renderCandlestick",
+                "ohlcvChart", labels, ohlc, volumes);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Chart render failed — JS interop error");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("chartInterop.destroy");
+        }
+        catch
+        {
+            // Circuit may be disposed — ignore
+        }
+    }
+}
+

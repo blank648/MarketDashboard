@@ -44,8 +44,6 @@ builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
-// Seed roles
-await RoleSeeder.SeedRolesAsync(app.Services);
 
 if (!app.Environment.IsDevelopment())
 {
@@ -65,5 +63,14 @@ app.MapHub<MarketHub>("/hubs/market");
 
 // Identity Razor Pages endpoints (for Login/Register/Logout)
 app.MapAdditionalIdentityEndpoints();
+
+// Seed Admin role
+using (var scope = app.Services.CreateScope())
+{
+    var adminService = scope.ServiceProvider
+        .GetRequiredService<MarketDashboard.Infrastructure.Services.AdminService>();
+    await adminService.EnsureAdminRoleExistsAsync(
+        CancellationToken.None);
+}
 
 app.Run();
