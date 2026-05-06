@@ -2,7 +2,11 @@
 
 > **Lucrare universitară** — Proiectarea Aplicațiilor Web  
 > **Student:** Adrian Diaconescu  
+<<<<<<< Updated upstream
 > **Facultate:** Universitatea din București - Facultatea de Matematică și Informatică 
+=======
+> **Facultate:** Universitatea Tehnică — Inginerie Software  
+>>>>>>> Stashed changes
 > **An universitar:** 2025–2026
 
 Aplicație web **Full-Stack** în C# pentru vizualizarea și monitorizarea datelor financiare în timp real, construită pe ASP.NET Core 8, Blazor Server și SignalR.

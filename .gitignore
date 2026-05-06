@@ -9,3 +9,5 @@ appsettings.Production.json
 *.p12
 .env
 appsettings.Development.json
+src/MarketDashboard.Web/output.log
+/tmp/*.log
