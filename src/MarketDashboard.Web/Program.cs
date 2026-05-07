@@ -41,6 +41,7 @@ builder.Services.AddSingleton<IPriceUpdateBroadcaster,
     SignalRPriceUpdateBroadcaster>();
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<DatabaseSeeder>();
 
 var app = builder.Build();
 
@@ -71,6 +72,16 @@ using (var scope = app.Services.CreateScope())
         .GetRequiredService<MarketDashboard.Infrastructure.Services.AdminService>();
     await adminService.EnsureAdminRoleExistsAsync(
         CancellationToken.None);
+}
+
+// Database Seeding
+using (var seedScope = app.Services.CreateScope())
+{
+    var logger = seedScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    logger.LogInformation("Running database seed...");
+    var seeder = seedScope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
+    await seeder.SeedAsync(CancellationToken.None);
+    logger.LogInformation("Database seed complete");
 }
 
 app.Run();
