@@ -21,36 +21,38 @@
     </div>
 }
 
+@using MarketDashboard.Web.Models
+
 <div class="card" style="margin-bottom:24px;">
     <h5>Add New Symbol</h5>
-    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end; margin-top:16px;">
-        <div style="display:flex;flex-direction:column;gap:4px;">
-            <label style="font-size:12px;color:var(--text-muted);">
-                Ticker
-            </label>
-            <input class="form-input"
-                   @bind="_newTicker"
-                   @bind:after="() => _newTicker = _newTicker.ToUpper()"
-                   placeholder="e.g. MSFT"
-                   style="width:120px;"
-                   maxlength="10" />
+    <EditForm Model="_addModel" OnValidSubmit="AddSymbolAsync" FormName="add-symbol">
+        <DataAnnotationsValidator />
+        
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end; margin-top:16px;">
+            <div class="form-group">
+                <label class="form-label">Ticker</label>
+                <InputText class="form-input"
+                           @bind-Value="_addModel.Ticker"
+                           @bind-Value:after="() => _addModel.Ticker = _addModel.Ticker?.ToUpper() ?? string.Empty"
+                           placeholder="e.g. MSFT"
+                           style="width:120px;" />
+                <ValidationMessage For="() => _addModel.Ticker" class="validation-message" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Company Name</label>
+                <InputText class="form-input"
+                           @bind-Value="_addModel.CompanyName"
+                           placeholder="e.g. Microsoft Corp"
+                           style="width:220px;" />
+                <ValidationMessage For="() => _addModel.CompanyName" class="validation-message" />
+            </div>
+            <button type="submit" class="btn btn-primary"
+                    disabled="@_isAdding">
+                @(_isAdding ? "Adding..." : "+ Add Symbol")
+            </button>
         </div>
-        <div style="display:flex;flex-direction:column;gap:4px;">
-            <label style="font-size:12px;color:var(--text-muted);">
-                Company Name
-            </label>
-            <input class="form-input"
-                   @bind="_newCompanyName"
-                   placeholder="e.g. Microsoft Corp"
-                   style="width:220px;"
-                   maxlength="100" />
-        </div>
-        <button class="btn btn-primary"
-                @onclick="AddSymbolAsync"
-                disabled="@(_isAdding || string.IsNullOrWhiteSpace(_newTicker))">
-            @(_isAdding ? "Adding..." : "+ Add Symbol")
-        </button>
-    </div>
+    </EditForm>
+
     @if (!string.IsNullOrEmpty(_addError))
     {
         <p style="color:var(--accent-red);font-size:13px;margin-top:8px;">
@@ -116,8 +118,7 @@
 
 @code {
     private List<Symbol> _symbols = [];
-    private string _newTicker = string.Empty;
-    private string _newCompanyName = string.Empty;
+    private AddSymbolModel _addModel = new();
     private string _message = string.Empty;
     private string _addError = string.Empty;
     private bool _isError;
@@ -153,11 +154,10 @@
         try
         {
             await AdminService.AddSymbolAsync(
-                _newTicker, _newCompanyName, CancellationToken.None);
-            _message = $"Symbol {_newTicker} added successfully.";
+                _addModel.Ticker, _addModel.CompanyName, CancellationToken.None);
+            _message = $"Symbol {_addModel.Ticker} added successfully.";
             _isError = false;
-            _newTicker = string.Empty;
-            _newCompanyName = string.Empty;
+            _addModel = new();
             await LoadSymbolsAsync();
         }
         catch (Exception ex)

@@ -1,35 +1,28 @@
 using MarketDashboard.Core.Entities;
 using MarketDashboard.Core.Interfaces;
-using MarketDashboard.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace MarketDashboard.Infrastructure.Services;
 
 public class OhlcvService : IOhlcvService
 {
-    private readonly IDbContextFactory<AppDbContext> _dbFactory;
-    private readonly IMarketDataSource _marketDataSource;
+    private readonly IOhlcvRepository _repository;
+    private readonly IMarketDataSource _dataSource;
     private readonly ILogger<OhlcvService> _logger;
 
     public OhlcvService(
-        IDbContextFactory<AppDbContext> dbFactory,
-        IMarketDataSource marketDataSource,
+        IOhlcvRepository repository,
+        IMarketDataSource dataSource,
         ILogger<OhlcvService> logger)
     {
-        _dbFactory = dbFactory;
-        _marketDataSource = marketDataSource;
-        _logger = logger;
+        _repository = repository;
+        _dataSource = dataSource;
+        _logger     = logger;
     }
 
     public async Task SyncAsync(string symbol, CancellationToken ct)
     {
-        using var db = await _dbFactory.CreateDbContextAsync(ct);
-
-        var lastRecord = await db.OhlcvRecords
-            .Where(r => r.Symbol == symbol)
-            .OrderByDescending(r => r.PeriodStart)
-            .FirstOrDefaultAsync(ct);
+        var lastRecord = await _repository.GetLatestBySymbolAsync(symbol, ct);
 
         if (lastRecord != null &&
             lastRecord.PeriodStart >= DateTime.UtcNow.AddHours(-24))
@@ -38,20 +31,20 @@ public class OhlcvService : IOhlcvService
             return;
         }
 
-        var dailyData = await _marketDataSource.GetDailyOhlcvAsync(symbol, 30, ct);
+        var dailyData = await _dataSource.GetDailyOhlcvAsync(symbol, 30, ct);
         int count = 0;
 
-        var existingSymbol = await db.Symbols.FirstOrDefaultAsync(s => s.Ticker == symbol, ct);
-        int symbolId = existingSymbol?.Id ?? 0; // Requires symbol existing, or map differently depending on db.
+        // Best effort to preserve SymbolId without querying Symbols table
+        int symbolId = lastRecord?.SymbolId ?? 0;
 
         foreach (var data in dailyData)
         {
-            var existingRecord = await db.OhlcvRecords.FirstOrDefaultAsync(
+            var existingRecord = await _repository.FirstOrDefaultAsync(
                 r => r.Symbol == symbol && r.PeriodStart == data.PeriodStart, ct);
 
             if (existingRecord == null)
             {
-                db.OhlcvRecords.Add(new OhlcvRecord
+                var newRecord = new OhlcvRecord
                 {
                     Symbol = symbol,
                     Open = data.Open,
@@ -62,7 +55,8 @@ public class OhlcvService : IOhlcvService
                     PeriodStart = data.PeriodStart,
                     PeriodEnd = data.PeriodEnd,
                     SymbolId = symbolId
-                });
+                };
+                await _repository.AddAsync(newRecord, ct);
             }
             else
             {
@@ -72,41 +66,25 @@ public class OhlcvService : IOhlcvService
                 existingRecord.Close = data.Close;
                 existingRecord.Volume = data.Volume;
                 existingRecord.PeriodEnd = data.PeriodEnd;
+                _repository.Update(existingRecord);
             }
             count++;
         }
 
-        await db.SaveChangesAsync(ct);
+        await _repository.SaveChangesAsync(ct);
         _logger.LogInformation("OHLCV sync complete for {Symbol}: {Count} records", symbol, count);
     }
 
     public async Task<IEnumerable<OhlcvRecord>> GetRecordsAsync(string symbol, DateOnly from, DateOnly to, CancellationToken ct)
     {
-        using var db = await _dbFactory.CreateDbContextAsync(ct);
         var fromDate = from.ToDateTime(TimeOnly.MinValue);
         var toDate = to.ToDateTime(TimeOnly.MaxValue);
 
-        return await db.OhlcvRecords
-            .Where(r => r.Symbol == symbol && r.PeriodStart >= fromDate && r.PeriodStart <= toDate)
-            .OrderBy(r => r.PeriodStart)
-            .ToListAsync(ct);
+        return await _repository.GetBySymbolAsync(symbol, fromDate, toDate, ct);
     }
 
     public async Task<IEnumerable<string>> GetAvailableSymbolsAsync(CancellationToken ct)
     {
-        using var db = await _dbFactory.CreateDbContextAsync(ct);
-        
-        var ohlcvSymbols = await db.OhlcvRecords
-            .Select(r => r.Symbol)
-            .Distinct()
-            .ToListAsync(ct);
-
-        var activeSymbols = await db.Symbols
-            .Where(s => s.IsActive)
-            .Select(s => s.Ticker)
-            .ToListAsync(ct);
-
-        return ohlcvSymbols.Union(activeSymbols).Order().ToList();
+        return await _repository.GetAvailableSymbolsAsync(ct);
     }
 }
-

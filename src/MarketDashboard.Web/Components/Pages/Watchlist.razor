@@ -16,26 +16,30 @@
     <p class="text-muted">Track your favorite market symbols.</p>
 </div>
 
+@using MarketDashboard.Web.Models
+
 <!-- Add symbol form -->
 <div class="card mb-4" style="max-width: 500px;">
     <div class="card-body">
         <h6 class="card-title">Add Symbol</h6>
-        <div class="input-group">
-            <input type="text"
-                   class="form-control text-uppercase"
-                   placeholder="e.g. AAPL, IBM"
-                   @bind="_newSymbol"
-                   @bind:event="oninput"
-                   @onkeydown="@(async (e) =>
-                       { if (e.Key == "Enter") await AddSymbolAsync(); })"
-                   maxlength="20"
-                   disabled="@_isAdding" />
-            <button class="btn btn-primary"
-                    @onclick="AddSymbolAsync"
-                    disabled="@(_isAdding || string.IsNullOrWhiteSpace(_newSymbol))">
-                @(_isAdding ? "Adding..." : "Add")
-            </button>
-        </div>
+        <EditForm Model="_addModel" OnValidSubmit="AddSymbolAsync" FormName="add-watchlist">
+            <DataAnnotationsValidator />
+            <div class="input-group" style="display:flex; flex-direction:column; gap:4px;">
+                <div style="display:flex;">
+                    <InputText class="form-control text-uppercase"
+                               placeholder="e.g. AAPL, IBM"
+                               @bind-Value="_addModel.Ticker"
+                               @bind-Value:after="() => _addModel.Ticker = _addModel.Ticker?.ToUpper() ?? string.Empty"
+                               style="flex:1;"
+                               disabled="@_isAdding" />
+                    <button type="submit" class="btn btn-primary"
+                            disabled="@_isAdding">
+                        @(_isAdding ? "Adding..." : "Add")
+                    </button>
+                </div>
+                <ValidationMessage For="() => _addModel.Ticker" class="validation-message" />
+            </div>
+        </EditForm>
         @if (_errorMessage != null)
         {
             <div class="alert alert-danger mt-2 mb-0 py-2">@_errorMessage</div>
@@ -113,7 +117,7 @@ else
 
 @code {
     private List<WatchlistItem> _items = [];
-    private string _newSymbol = string.Empty;
+    private AddWatchlistModel _addModel = new();
     private string? _errorMessage;
     private string? _successMessage;
     private bool _isLoading = true;
@@ -150,15 +154,14 @@ else
 
     private async Task AddSymbolAsync()
     {
-        if (string.IsNullOrWhiteSpace(_newSymbol)) return;
         _isAdding = true;
         _errorMessage = null;
         _successMessage = null;
         try
         {
-            await WatchlistService.AddToWatchlistAsync(_userId, _newSymbol, CancellationToken.None);
-            _successMessage = $"{_newSymbol.Trim().ToUpperInvariant()} added to watchlist.";
-            _newSymbol = string.Empty;
+            await WatchlistService.AddToWatchlistAsync(_userId, _addModel.Ticker, CancellationToken.None);
+            _successMessage = $"{_addModel.Ticker.Trim().ToUpperInvariant()} added to watchlist.";
+            _addModel = new();
             await LoadWatchlistAsync();
         }
         catch (InvalidOperationException ex)

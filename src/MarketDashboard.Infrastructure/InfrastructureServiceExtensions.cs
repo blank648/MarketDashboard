@@ -9,6 +9,7 @@ using MarketDashboard.Core.Interfaces;
 using MarketDashboard.Infrastructure.DataSources;
 using MarketDashboard.Infrastructure.Services;
 using Microsoft.Extensions.Options;
+using MarketDashboard.Infrastructure.Repositories;
 
 namespace MarketDashboard.Infrastructure;
 
@@ -63,6 +64,10 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IPriceAlertService, PriceAlertService>();
         services.AddScoped<IOhlcvService, OhlcvService>();
         services.AddScoped<AdminService>();
+
+        // Repository Pattern
+        services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+        services.AddScoped<IOhlcvRepository, OhlcvRepository>();
 
         return services;
     }

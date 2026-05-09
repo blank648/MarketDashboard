@@ -112,6 +112,7 @@ public class AlphaVantageDataSource(
                 var volume = long.Parse(data.GetProperty("5. volume").GetString()!, CultureInfo.InvariantCulture);
 
                 results.Add(new OhlcvDto(
+                    0,
                     symbol.ToUpperInvariant(),
                     open,
                     high,

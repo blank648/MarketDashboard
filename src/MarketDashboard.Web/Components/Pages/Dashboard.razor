@@ -13,6 +13,7 @@
 @inject IWatchlistService WatchlistService
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ILogger<Dashboard> Logger
+@inject IJSRuntime JS
 
 <PageTitle>Dashboard — MarketDash</PageTitle>
 
@@ -120,6 +121,14 @@
             to track them here.
         </p>
     </div>
+
+    <!-- JS API Integration Widget — consumes /api/prices/latest -->
+    <div id="market-api-widget">
+        <div class="widget-loading">
+            <div class="widget-spinner"></div>
+            <span>Loading market data...</span>
+        </div>
+    </div>
 }
 
 @code {
@@ -220,8 +229,25 @@
         _isLoading = false;
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("MarketWidget.init");
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
+        try
+        {
+            await JS.InvokeVoidAsync("MarketWidget.destroy");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Error destroying MarketWidget");
+        }
+
         if (_hubConnection is not null)
         {
             try
