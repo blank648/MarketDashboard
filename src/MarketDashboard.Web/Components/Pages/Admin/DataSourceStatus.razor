@@ -1,0 +1,147 @@
+@page "/admin/datasource"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@using MarketDashboard.Core.Enums
+@using MarketDashboard.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject IConfiguration Configuration
+@inject ILogger<DataSourceStatus> Logger
+
+<PageTitle>Data Source Status — MarketDash</PageTitle>
+
+<div class="page-header">
+    <h2>Data Source Status</h2>
+    <p>Active provider and recent write counts — Module 15 (C++ Integration)</p>
+</div>
+
+@if (_isLoading)
+{
+    <div class="loading-row">
+        <div class="spinner-sm"></div>
+        <span>Loading status...</span>
+    </div>
+}
+else
+{
+    <div class="card" style="margin-bottom:1rem;">
+        <h4 style="margin-bottom:0.75rem;">Configuration</h4>
+        <table class="data-table">
+            <tbody>
+                <tr>
+                    <td><strong>Active Provider</strong></td>
+                    <td><span class="badge badge-admin">@_provider</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Staleness Threshold</strong></td>
+                    <td>@_stalenessMinutes minutes</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card" style="margin-bottom:1rem;">
+        <h4 style="margin-bottom:0.75rem;">C++ Processor (last 60 min)</h4>
+        <table class="data-table">
+            <tbody>
+                <tr>
+                    <td><strong>Records Written</strong></td>
+                    <td>@_cppCount</td>
+                </tr>
+                <tr>
+                    <td><strong>Last Write</strong></td>
+                    <td>
+                        @if (_cppLastWrite.HasValue)
+                        {
+                            <span>@_cppLastWrite.Value.ToString("yyyy-MM-dd HH:mm:ss") UTC</span>
+                        }
+                        else
+                        {
+                            <span style="color:var(--text-muted);">No data in last 60 minutes</span>
+                        }
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Status</strong></td>
+                    <td>
+                        @if (_cppFresh)
+                        {
+                            <span class="badge badge-admin">Fresh</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-user">Stale / Offline</span>
+                        }
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h4 style="margin-bottom:0.75rem;">Alpha Vantage (last 60 min)</h4>
+        <table class="data-table">
+            <tbody>
+                <tr>
+                    <td><strong>Records Written</strong></td>
+                    <td>@_avCount</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div style="margin-top:1rem;">
+        <button class="btn btn-primary" @onclick="LoadStatusAsync">Refresh</button>
+    </div>
+}
+
+@code {
+    private bool _isLoading = true;
+    private string _provider = "AlphaVantage";
+    private int _stalenessMinutes = 5;
+    private int _cppCount;
+    private int _avCount;
+    private DateTime? _cppLastWrite;
+    private bool _cppFresh;
+
+    protected override async Task OnInitializedAsync() => await LoadStatusAsync();
+
+    private async Task LoadStatusAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _provider = Configuration.GetValue<string>("DataSource:Provider") ?? "AlphaVantage";
+            _stalenessMinutes = Configuration.GetValue<int>("DataSource:CppStalenessThresholdMinutes", 5);
+
+            var window60 = DateTime.UtcNow.AddMinutes(-60);
+            var stalenessCutoff = DateTime.UtcNow.AddMinutes(-_stalenessMinutes);
+
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            _cppCount = await db.MarketPrices
+                .CountAsync(p => p.Source == DataSourceProvider.CppProcessor && p.RecordedAt > window60);
+
+            _cppLastWrite = await db.MarketPrices
+                .Where(p => p.Source == DataSourceProvider.CppProcessor)
+                .OrderByDescending(p => p.RecordedAt)
+                .Select(p => (DateTime?)p.RecordedAt)
+                .FirstOrDefaultAsync();
+
+            _cppFresh = await db.MarketPrices
+                .AnyAsync(p => p.Source == DataSourceProvider.CppProcessor && p.RecordedAt > stalenessCutoff);
+
+            _avCount = await db.MarketPrices
+                .CountAsync(p => p.Source == DataSourceProvider.AlphaVantage && p.RecordedAt > window60);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load data source status");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

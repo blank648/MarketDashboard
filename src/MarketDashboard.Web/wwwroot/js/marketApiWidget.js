@@ -2,7 +2,7 @@
 // Consumes /api/symbols (public) + /api/prices?symbol=X (authenticated)
 // Demonstrates: fetch, loading/error handling, DOM manipulation
 
-const MarketWidget = (function () {
+window.MarketWidget = (function () {
 
   // Render a loading skeleton
   function showLoading(container) {

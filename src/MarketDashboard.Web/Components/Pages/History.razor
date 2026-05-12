@@ -157,9 +157,11 @@
     private bool _isLoading;
     private bool _isSyncing;
     private string _syncError = string.Empty;
+    private bool _chartReady;
 
     protected override async Task OnInitializedAsync()
     {
+        // Step 1 — available symbols (DB)
         try
         {
             var symbols = await OhlcvService
@@ -174,13 +176,60 @@
             Logger.LogWarning(ex, "Could not load available symbols");
             _availableSymbols = ["IBM", "AAPL"];
         }
+
+        // Step 2 — sync from data source (DB + HTTP, sequential after step 1)
+        _isSyncing = true;
+        _syncError = string.Empty;
+        StateHasChanged();
+        try
+        {
+            await OhlcvService.SyncAsync(
+                _selectedSymbol, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex,
+                "Sync failed for {Symbol} — loading cached data",
+                _selectedSymbol);
+            _syncError = "Could not fetch latest data. Showing cached.";
+        }
+        finally
+        {
+            _isSyncing = false;
+        }
+
+        // Step 3 — load records into _records (DB, sequential after step 2)
+        _isLoading = true;
+        StateHasChanged();
+        try
+        {
+            var data = await OhlcvService.GetRecordsAsync(
+                _selectedSymbol, _fromDate, _toDate,
+                CancellationToken.None);
+            _records = data.ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load OHLCV records");
+            _records = [];
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+
+        StateHasChanged();
+        // Signal OnAfterRenderAsync to render the chart once the DOM is ready
+        _chartReady = true;
     }
 
+    // Only JS interop here — all DB work is done sequentially in OnInitializedAsync
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (_chartReady)
         {
-            await SyncAndLoadAsync();
+            _chartReady = false;
+            await RenderChartAsync();
         }
     }
 

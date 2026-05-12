@@ -40,8 +40,19 @@ public static class InfrastructureServiceExtensions
                 "User-Agent", "MarketDashboard/1.0");
         });
 
-        // Register data source
-        services.AddScoped<IMarketDataSource, AlphaVantageDataSource>();
+        // Register data sources — provider selected via "DataSource:Provider" config key
+        var provider = configuration.GetValue<string>("DataSource:Provider") ?? "AlphaVantage";
+
+        services.AddScoped<AlphaVantageDataSource>();
+        services.AddScoped<CppSharedDbDataSource>();
+        services.AddScoped<HybridMarketDataSource>();
+
+        services.AddScoped<IMarketDataSource>(sp => provider switch
+        {
+            "CppProcessor" => sp.GetRequiredService<CppSharedDbDataSource>(),
+            "Hybrid"       => sp.GetRequiredService<HybridMarketDataSource>(),
+            _              => sp.GetRequiredService<AlphaVantageDataSource>()
+        });
 
         // Identity configuration
         services.AddIdentityCore<ApplicationUser>(options =>

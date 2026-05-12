@@ -14,6 +14,7 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ILogger<Dashboard> Logger
 @inject IJSRuntime JS
+@inject IConfiguration Configuration
 
 <PageTitle>Dashboard — MarketDash</PageTitle>
 
@@ -114,7 +115,7 @@
 
     <div style="margin-top:24px;">
         <p style="font-size:12px;color:var(--text-muted);">
-            Data: Alpha Vantage API (demo key — AAPL and IBM only).
+            Data: @(Configuration["DataSource:Provider"] ?? "Alpha Vantage") API.
             Add symbols to your
             <a href="/watchlist"
                style="color:var(--accent-blue);">watchlist</a>
@@ -233,7 +234,19 @@
     {
         if (firstRender)
         {
-            await JS.InvokeVoidAsync("MarketWidget.init");
+            try
+            {
+                await JS.InvokeVoidAsync("MarketWidget.init");
+            }
+            catch (JSException ex)
+            {
+                Logger.LogError(ex, "MarketWidget.init failed — JS interop error");
+                // Do NOT rethrow — let the page render without the widget
+            }
+            catch (TaskCanceledException)
+            {
+                // Circuit disconnected — ignore
+            }
         }
     }
 
@@ -243,9 +256,17 @@
         {
             await JS.InvokeVoidAsync("MarketWidget.destroy");
         }
-        catch (Exception ex)
+        catch (InvalidOperationException ex)
         {
-            Logger.LogWarning(ex, "Error destroying MarketWidget");
+            Logger.LogDebug(ex, "DisposeAsync: JS interop not available (prerender)");
+        }
+        catch (JSDisconnectedException ex)
+        {
+            Logger.LogDebug(ex, "DisposeAsync: circuit disconnected");
+        }
+        catch (TaskCanceledException ex)
+        {
+            Logger.LogDebug(ex, "DisposeAsync: cancelled");
         }
 
         if (_hubConnection is not null)
